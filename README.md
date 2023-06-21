@@ -12,7 +12,7 @@ Alternatively, on any system, you may choose to mount the ESP/the separate FAT32
 
 ## Example
 
-``./LimineLinuxDeploy --boot-directory /boot/efi --default-config limine.default --output-config limine.cfg``
+``./LimineLinuxDeploy --bootdir /boot/efi --defconf limine.default --outconf limine.cfg``
 
 **limine.default**:
 ```
