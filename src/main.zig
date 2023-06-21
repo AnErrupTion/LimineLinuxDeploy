@@ -1,4 +1,5 @@
 const std = @import("std");
+const clap = @import("clap");
 const ini = @import("ini.zig");
 
 const DefaultConfig = struct {
@@ -12,15 +13,16 @@ const DefaultConfig = struct {
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
-var boot_directory: []const u8 = undefined;
-var default_config: []const u8 = undefined;
-var output_config: []const u8 = undefined;
+var boot_directory: []const u8 = "";
+var default_config: []const u8 = "";
+var output_config: []const u8 = "";
+var timeout: u64 = 0;
+var distributor: []const u8 = "";
+var cmdline: []const u8 = "";
 
 var disk_identifier: []const u8 = undefined;
 var kernels_path: std.ArrayList([]const u8) = undefined;
 var modules_path: std.ArrayList([]const u8) = undefined;
-
-var config: DefaultConfig = undefined;
 
 var permanent_buffers: std.ArrayList([]u8) = undefined;
 
@@ -32,39 +34,45 @@ pub fn main() !void {
     defer permanent_buffers.deinit();
 
     // Read command line arguments
-    var args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const params = comptime clap.parseParamsComptime(
+        \\-h, --help                Displays all arguments.
+        \\-b, --bootdir <str>       Specifies the boot directory containing the kernel images, and potentially modules as well.
+        \\-c, --defconf <str>       Specifies the default configuration file. Can be omitted in favor of inline arguments.
+        \\-o, --outconf <str>       Specifies the output configuration file.
+        \\-t, --timeout <u64>       Specifies the bootloader timeout. Can be omitted in favor of the default configuration file.
+        \\-d, --distributor <str>   Specifies the name of the distributor. Can be omitted in favor of the default configuration file.
+        \\-m, --cmdline <str>       Specifies the kernel command line. Can be omitted in favor of the default configuration file.
+    );
 
-    if (args.len < 7) {
-        std.debug.print("Correct usage: LimineLinuxDeploy --boot-directory <path> --default-config <path> --output-config <path>", .{});
-        std.os.exit(1);
+    var diag = clap.Diagnostic{};
+    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{ .diagnostic = &diag }) catch |err| {
+        diag.report(std.io.getStdErr().writer(), err) catch {};
+        return err;
+    };
+    defer res.deinit();
+
+    if (res.args.help != 0) {
+        try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
+        std.os.exit(0);
     }
+    if (res.args.bootdir) |s| boot_directory = s;
+    if (res.args.defconf) |s| default_config = s;
+    if (res.args.outconf) |s| output_config = s;
+    if (res.args.timeout) |n| timeout = n;
+    if (res.args.distributor) |s| distributor = s;
+    if (res.args.cmdline) |s| cmdline = s;
 
-    var index: u32 = 1;
+    // Read default configuration file, if any
+    if (default_config.len > 0) {
+        var buffer = try std.fs.cwd().readFileAlloc(allocator, default_config, 16 * 1024);
+        try permanent_buffers.append(buffer);
 
-    while (index < args.len) : (index += 1) {
-        var arg = args[index];
+        var config = try ini.readToStruct(DefaultConfig, buffer);
 
-        if (std.mem.eql(u8, arg, "--boot-directory")) {
-            index += 1;
-            boot_directory = args[index];
-        } else if (std.mem.eql(u8, arg, "--default-config")) {
-            index += 1;
-            default_config = args[index];
-        } else if (std.mem.eql(u8, arg, "--output-config")) {
-            index += 1;
-            output_config = args[index];
-        } else {
-            std.debug.print("Error: Invalid argument \"{s}\"", .{arg});
-            std.os.exit(1);
-        }
+        timeout = config.linux.timeout;
+        distributor = config.linux.distributor;
+        cmdline = config.linux.cmdline;
     }
-
-    // Read default configuration file
-    var buffer = try std.fs.cwd().readFileAlloc(allocator, default_config, 16 * 1024);
-    defer allocator.free(buffer);
-
-    config = try ini.readToStruct(DefaultConfig, buffer);
 
     kernels_path = std.ArrayList([]const u8).init(allocator);
     defer kernels_path.deinit();
@@ -82,9 +90,7 @@ pub fn main() !void {
     try write_config();
 
     // Free all permanent buffers
-    for (permanent_buffers.items) |item| {
-        allocator.free(item);
-    }
+    for (permanent_buffers.items) |item| allocator.free(item);
 
     std.log.info("Successfully generated a Limine configuration file! Make sure to put it under {s}. ;)\n", .{boot_directory});
 }
@@ -129,9 +135,7 @@ fn read_fstab() !void {
 
     while (fstab_lines.next()) |line| {
         // If it contains " / " then it's most likely the root partition
-        if (!std.mem.containsAtLeast(u8, line, 1, " / ")) {
-            continue;
-        }
+        if (!std.mem.containsAtLeast(u8, line, 1, " / ")) continue;
 
         var fstab_options = std.mem.splitSequence(u8, line, " ");
 
@@ -144,13 +148,13 @@ fn write_config() !void {
     defer limine_cfg.deinit();
 
     // Global configuration
-    var global_config = try std.fmt.allocPrint(allocator, "TIMEOUT={d}\nINTERFACE_BRANDING={s}", .{ config.linux.timeout, config.linux.distributor });
+    var global_config = try std.fmt.allocPrint(allocator, "TIMEOUT={d}\nINTERFACE_BRANDING={s}", .{ timeout, distributor });
     defer allocator.free(global_config);
 
     try limine_cfg.append(global_config);
 
     // Kernel command line
-    var kernel_cmdline = try std.fmt.allocPrint(allocator, "CMDLINE=root={s} {s}", .{ disk_identifier, config.linux.cmdline });
+    var kernel_cmdline = try std.fmt.allocPrint(allocator, "CMDLINE=root={s} {s}", .{ disk_identifier, cmdline });
     defer allocator.free(kernel_cmdline);
 
     // Kernel entries

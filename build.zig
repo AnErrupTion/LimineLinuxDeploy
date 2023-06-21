@@ -11,6 +11,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.addAnonymousModule("clap", .{
+        .source_file = .{ .path = "zig-clap/clap.zig" },
+    });
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
