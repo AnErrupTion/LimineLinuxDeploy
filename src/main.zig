@@ -22,21 +22,21 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (args.len < 7) {
-        std.debug.print("Correct usage: LimineDeploy --esp-directory <path> --default-config <path> --output-config <path>", .{});
+        std.debug.print("Correct usage: LimineLinuxDeploy --boot-directory <path> --default-config <path> --output-config <path>", .{});
         std.os.exit(1);
     }
 
-    var esp_directory: []const u8 = undefined;
-    var default_config: []const u8 = undefined;
-    var output_config: []const u8 = undefined;
+    var boot_directory: []const u8 = "";
+    var default_config: []const u8 = "";
+    var output_config: []const u8 = "";
     var index: u32 = 1;
 
     while (index < args.len) : (index += 1) {
         var arg = args[index];
 
-        if (std.mem.eql(u8, arg, "--esp-directory")) {
+        if (std.mem.eql(u8, arg, "--boot-directory")) {
             index += 1;
-            esp_directory = args[index];
+            boot_directory = args[index];
         } else if (std.mem.eql(u8, arg, "--default-config")) {
             index += 1;
             default_config = args[index];
@@ -44,7 +44,7 @@ pub fn main() !void {
             index += 1;
             output_config = args[index];
         } else {
-            std.debug.print("Invalid argument: {s}", .{arg});
+            std.debug.print("Error: Invalid argument \"{s}\"", .{arg});
             std.os.exit(1);
         }
     }
@@ -55,18 +55,18 @@ pub fn main() !void {
 
     var config = try ini.readToStruct(DefaultConfig, buffer);
 
-    var kernel_version: []const u8 = undefined;
-    var disk_identifier: []const u8 = undefined;
-    var kernel_path: []const u8 = undefined;
+    var kernel_version: []const u8 = "";
+    var disk_identifier: []const u8 = "";
+    var kernel_path: []const u8 = "";
 
     var modules_path = std.ArrayList([]const u8).init(allocator);
     defer modules_path.deinit();
 
-    // Iterate over all files in ESP directory
-    var boot_directory = try std.fs.openIterableDirAbsolute(esp_directory, .{});
-    defer boot_directory.close();
+    // Iterate over all files in the chosen directory
+    var boot_iterable_directory = try std.fs.openIterableDirAbsolute(boot_directory, .{});
+    defer boot_iterable_directory.close();
 
-    var iterator = boot_directory.iterate();
+    var iterator = boot_iterable_directory.iterate();
 
     while (try iterator.next()) |item| {
         var name = item.name;
@@ -132,4 +132,6 @@ pub fn main() !void {
     for (modules_path.items) |item| {
         allocator.free(item);
     }
+
+    std.log.info("Successfully generated a Limine configuration file! Make sure to put it under {s}. ;)\n", .{boot_directory});
 }
