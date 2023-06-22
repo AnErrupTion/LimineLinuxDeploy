@@ -1,6 +1,6 @@
 const std = @import("std");
 const clap = @import("clap");
-const ini = @import("ini.zig");
+const ini = @import("ini");
 
 const DefaultConfig = struct {
     linux: struct {

@@ -69,3 +69,4 @@ fi
 
 # Clean up
 rm -rf limine
+rm -rf LimineLinuxDeploy

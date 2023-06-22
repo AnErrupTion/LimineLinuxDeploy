@@ -14,6 +14,9 @@ pub fn build(b: *std.Build) void {
     const clap = b.dependency("clap", .{});
     exe.addModule("clap", clap.module("clap"));
 
+    const ini = b.dependency("ini", .{});
+    exe.addModule("ini", ini.module("ini"));
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
