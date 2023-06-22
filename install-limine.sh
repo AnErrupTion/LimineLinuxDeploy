@@ -15,14 +15,19 @@ if [ ! -d "${bootdir}" ]; then
 	exit
 fi
 
-echo Disk to install Limine to (this can be ignored on UEFI):
-read biosdisk
+echo Disk to install Limine to:
+read disk
+
+echo EFI System Partition number (can be ignored on BIOS):
+read espnum
 
 echo Bootloader timeout:
 read timeout
 
+cd /tmp
+
 echo Downloading Limine...
-git clone https://github.com/limine-bootloader/limine/tree/v5.x-branch-binary
+git clone https://github.com/limine-bootloader/limine -b v5.x-branch-binary
 
 echo Downloading Limine Linux Deploy...
 git clone https://github.com/AnErrupTion/LimineLinuxDeploy
@@ -42,7 +47,7 @@ if [ -d /sys/firmware/efi ]; then
 	cp limine/BOOTX64.EFI "${bootdir}/EFI/limine/amd64.efi"
 
 	# Create new EFI boot entry
-	efibootmgr -c -L "limine" -l "\EFI\limine\amd64.efi"
+	efibootmgr -c -d ${disk} -p ${espnum} -L "limine" -l "\EFI\limine\amd64.efi"
 else
 	# System has been booted in BIOS mode
 
@@ -53,10 +58,14 @@ else
 	echo Building Limine deployment tool...
 	cd limine
 	make -j$(nproc)
+	cd ..
 
 	# Deploy Limine to device
-	./limine bios-install ${biosdisk}
+	./limine/limine bios-install ${disk}
 fi
 
 # Generate configuration file
 ./LimineLinuxDeploy/zig-out/bin/LimineLinuxDeploy --bootdir "${bootdir}" --timeout ${timeout} --distributor "Limine Linux Deploy" --cmdline "$(cat /proc/cmdline)" --outconf "${bootdir}/limine.cfg"
+
+# Clean up
+rm -rf limine

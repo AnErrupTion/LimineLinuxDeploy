@@ -2,6 +2,8 @@
 
 Limine Linux Deploy is a dead simple utility meant to generate a Limine configuration file based on a default, simple configuration file.
 
+A separate configuration file is not your cup of tea? Use inline arguments instead!
+
 ## Note regarding kernels outside of EFI System Partition
 
 If, for some reason, your kernel resides outside of the ESP (perhaps it lives in /boot even in an EFI-based system, or you have a BIOS-based system), Limine will only be able to find its configuration file (and thus load your kernel) if the partition containing the kernel (usually root) is ext2/3/4.
@@ -10,14 +12,18 @@ If you have a BIOS-based system, you can always create a separate FAT32 partitio
 
 Alternatively, on any system, you may choose to mount the ESP/the separate FAT32 partition directly as /boot if your distribution uses that path to put kernels and other shenanigans.
 
-## Example
+## Example with a default configuration file
 
-``./LimineLinuxDeploy --bootdir /boot/efi --defconf limine.default --outconf limine.cfg``
+``./LimineLinuxDeploy --bootdir /boot --defconf limine.default --outconf limine.cfg``
 
 **limine.default**:
-```
+```ini
 [linux]
 timeout = 0
 distributor = AnErrupTion
 cmdline = loglevel=4
 ```
+
+## Example with inline arguments
+
+``./LimineLinuxDeploy --bootdir /boot --timeout 0 --distributor AnErrupTion --cmdline "loglevel=4" --outconf limine.cfg``
