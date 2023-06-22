@@ -11,9 +11,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe.addAnonymousModule("clap", .{
-        .source_file = .{ .path = "zig-clap/clap.zig" },
-    });
+    const clap = b.dependency("clap", .{});
+    exe.addModule("clap", clap.module("clap"));
 
     b.installArtifact(exe);
 
