@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const clap = b.dependency("clap", .{});
+    const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     exe.addModule("clap", clap.module("clap"));
 
     const ini = b.dependency("ini", .{});
